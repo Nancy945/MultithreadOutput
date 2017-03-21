@@ -1,10 +1,13 @@
 package com.company;
 
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
- * 核心思路是利用一个对象的prev变量进行判断
+ * 与wait和notify的方法类似。
  * Created by Nancy on 2017/3/21.
  */
-public class WaitAndNotify {
+public class AwaitAndSignal {
     public static void main(String[] args) {
         Method method = new Method();
         for (int i = 0; i < 10; i++) {
@@ -15,6 +18,8 @@ public class WaitAndNotify {
             ThreadC threadC = new ThreadC(method);
             threadC.start();
         }
+
+
     }
 
     private static class ThreadA extends Thread {
@@ -66,53 +71,68 @@ public class WaitAndNotify {
     }
 
     private static class Method {
-
         private char prev = 'C';//默认先打印A，所以设置为C
+        private ReentrantLock lock = new ReentrantLock();
+        //定向唤醒，效率更高
+        private Condition conditionA = lock.newCondition();
+        private Condition conditionB = lock.newCondition();
+        private Condition conditionC = lock.newCondition();
 
-        synchronized void methodA() {
+        void methodA() {
             try {
+                lock.lock();
                 while (prev != 'C') {
-                    wait();
+                    conditionA.await();
                 }
 
                 System.out.print("A");
-
                 prev = 'A';
-                notifyAll();
+                conditionB.signalAll();
+
             } catch (InterruptedException e) {
                 e.printStackTrace();
+            } finally {
+                lock.unlock();
             }
+
+
         }
 
-        synchronized void methodB() {
+        void methodB() {
             try {
+                lock.lock();
                 while (prev != 'A') {
-                    wait();
+                    conditionB.await();
                 }
 
                 System.out.print("B");
-
                 prev = 'B';
-                notifyAll();
+                conditionC.signalAll();
             } catch (InterruptedException e) {
                 e.printStackTrace();
+            } finally {
+                lock.unlock();
             }
         }
 
-        synchronized void methodC() {
+        void methodC() {
             try {
+                lock.lock();
                 while (prev != 'B') {
-                    wait();
+                    conditionC.await();
                 }
 
                 System.out.println("C");
-
                 prev = 'C';
-                notifyAll();
+                conditionA.signalAll();
             } catch (InterruptedException e) {
                 e.printStackTrace();
+            } finally {
+                lock.unlock();
             }
         }
+
+
     }
 
 }
